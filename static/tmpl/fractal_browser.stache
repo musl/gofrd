@@ -1,0 +1,58 @@
+<div id="image"></div>
+<div class="pure-g">
+	<div class="pure-u-1 pure-u-md-1-4">
+		<p>
+			<a href="{{url}}">direct link</a><br>
+			<a href="#" can-click="update_view">fit & redraw</a>
+		<p>
+	</div>
+	<div class="pure-u-1 pure-u-md-3-4">
+		<p>
+			min: {{complex view.rmin view.imin}}<br>
+			max: {{complex view.rmax view.imax}}
+		</p>
+	</div>	
+</div>
+<form class="pure-form pure-form-stacked">
+	<div class="pure-g">
+		<div class="pure-u-1 pure-u-md-1-4">
+			<label>move</label>
+			<input type="button" value="&uarr;" can-click="move_up">
+			<input type="button" value="&darr;" can-click="move_down">
+			<input type="button" value="&larr;" can-click="move_left">
+			<input type="button" value="&rarr;" can-click="move_right">
+		</div>
+		<div class="pure-u-1 pure-u-md-1-4">
+			<label>zoom</label>
+			<input type="button" value="++" can-click="zoom_in_4x">
+			<input type="button" value="+" can-click="zoom_in">
+			<input type="button" value="-" can-click="zoom_out">
+			<input type="button" value="--" can-click="zoom_out_4x">
+		</div>
+		<div class="pure-u-1 pure-u-md-1-4">
+			<label>iterations</label>
+			<input type="text" can-value="view.i">
+		</div>
+		<div class="pure-u-1 pure-u-md-1-4">
+			<label>escape radius</label>
+			<input type="text" can-value="view.e">
+		</div>
+		<div class="pure-u-1 pure-u-md-1-4">
+			<label>member color</label>
+			<input type="color" can-value="view.m">
+		</div>
+		<div class="pure-u-1 pure-u-md-1-4">
+			<label>coloring algorithm</label>
+			<select can-value="view.c">
+				<option value="mono" selected>mono</option>
+				<option value="stripe">stripe</option>
+				<option value="bands">bands</option>
+				<option value="smooth">smooth</option>
+			</select>
+		</div>
+		<div class="pure-u-1 pure-u-md-1-4">
+			<label>bookmarks</label>
+			<input type="button" value="home" can-click="go_home">
+		</div>
+	</div>
+</form>
