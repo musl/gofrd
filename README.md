@@ -1,3 +1,3 @@
 # gofrd
 
-A shabby fractal rendering service and browser.
+A shabby but functional fractal rendering service and browser.
