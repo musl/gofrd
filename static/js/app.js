@@ -2,158 +2,278 @@
 
 var Gofr = {};
 
-Gofr.helpers = {
-	complex: function(r, i) {
-		if(typeof r === 'function') { r = r(); }
-		if(typeof i === 'function') { i = i(); }
+Gofr.storage = localStorage;
+
+Gofr.helpers = Ractive.defaults.data;
+Gofr.helpers.complex = function(r, i) {
 		return r + (i < 0 ? "" : "+") + i + "i";
-	}
 };
 
-Gofr.FractalBrowser = can.Control.extend({
-	defaults: {
-		view: '/tmpl/fractal_browser.stache',
-		width: 960,
-		height: 960,
-		bookmarks: {
-			home: {
+Gofr.ModalEditor = Ractive.extend({
+	template: '#editor-tmpl',
+	data: function() {
+		return { 
+			key: '',
+			text: '',
+			mode: 'text',
+			theme: 'github',
+		};
+	},
+	oncomplete: function() {
+		this.dialog = this.find('dialog');
+		this.editor = ace.edit(this.find('div.editor'));
+		this.session = this.editor.getSession();
+		this.doc = this.session.getDocument();
+
+		this.editor.setTheme("ace/theme/" + this.get('theme'));
+		this.session.setMode("ace/mode/" + this.get('mode'));
+		this.editor.$blockScrolling = Infinity;
+
+		this.observe('text', function(new_value, old_value) {
+			this.doc.setValue(new_value);
+		});
+
+		this.on({
+			save: function() {
+				this.set('text', this.doc.getValue());
+				this.fire('saved', this.get('key'), this.get('text'));
+				this.dialog.close();
+			},
+			revert: function() {
+				this.doc.setValue(this.get('text'));
+			},
+			dismiss: function() {
+				this.set('key', '');
+				this.set('text', '');
+				this.dialog.close();
+			},
+			edit: function(key, text) {
+				this.set('key', key);
+				this.set('text', text);
+				this.dialog.showModal();
+			}
+		});
+	}
+});
+Ractive.components.editor = Gofr.ModalEditor;
+
+Gofr.FractalBrowser = Ractive.extend({
+	template: '#browser-tmpl',
+	data: function() {
+		return {
+			width: 960,
+			height: 960,
+			view: {},
+			default_view: {
+				editable: false,
 				i: 300,
 				e: 4.0,
 				m: '#444444',
 				c: 'stripe',
+				s: 2.0,
 				rmin: -2.1,
 				rmax: 0.6,
 				imin: -1.25,
 				imax: 1.25
 			},
-		},
-	}
-}, {
-	init: function(element, options) {
-		var self;
+			bookmarks: {},
+			view_url: this.view_url
+		};
+	},
+	components: {
+			editor: Gofr.ModalEditor
+	},
+	onrender: function() {
+			var marks, self, view;
 
-		self = this;
+			self = this;
 
-		// TODO use local storage to keep the view
-		this.view = new can.Map(this.options.bookmarks.home);
-		this.view.attr({
-			w: this.options.width,
-			h: this.options.height,
+			view = JSON.parse(Gofr.storage.getItem('gofr.browser.view'));
+			if(view) {
+				this.set('view', view);
+			} else {
+				this.copy_view('default_view', 'view');
+			}
+
+			marks = JSON.parse(Gofr.storage.getItem('gofr.browser.marks'));
+			if(marks) {
+				$.each(marks, function(key, value) {
+					self.set('bookmarks.' + key, value); 
+				});
+			} else {
+				this.copy_view('default_view', 'bookmarks.home');
+			}
+	},
+	oncomplete: function() {
+		this.observe('view', function() {
+			this.update_view();
+			Gofr.storage.setItem('gofr.browser.view', this.json('view'));
 		});
 
-		this.view.bind('i', this.update_view.bind(this));
-		this.view.bind('e', this.update_view.bind(this));
-		this.view.bind('m', this.update_view.bind(this));
-		this.view.bind('c', this.update_view.bind(this));
-	},
-	update: function() {
-		var self;
+		this.observe('bookmarks', function() {
+			this.update_view();
+			Gofr.storage.setItem('gofr.browser.marks', this.json('bookmarks'));
+		});
 
-		self = this;
-
-		this.element.html(can.view(
-			this.options.view,
-			{
-				go_home: function(context, element, event) { 
-					self.set_view(self.options.bookmarks.home);
-					self.update_view();
-				},
-				move_up: function(context, element, event) { 
-					self.translate_view(0.0, -0.0625 * (self.view.imax - self.view.imin));
-					self.update_view();
-				},
-				move_down: function(context, element, event) { 
-					self.translate_view(0.0, 0.0625 * (self.view.imax - self.view.imin));
-					self.update_view();
-				},
-				move_left: function(context, element, event) { 
-					self.translate_view(-0.0625 * (self.view.rmax - self.view.rmin), 0.0);
-					self.update_view();
-				},
-				move_right: function(context, element, event) { 
-					self.translate_view(0.0625 * (self.view.rmax - self.view.rmin), 0.0);
-					self.update_view();
-				},
-				zoom_in: function(context, element, event) { 
-					self.scale_view(0.9);
-					self.update_view();
-				},
-				zoom_in_4x: function(context, element, event) { 
-					self.scale_view(0.6);
-					self.update_view();
-				},
-				zoom_out: function(context, element, event) { 
-					self.scale_view(1.1);
-					self.update_view();
-				},
-				zoom_out_4x: function(context, element, event) { 
-					self.scale_view(1.4);
-					self.update_view();
-				},
-				view: this.view,
-				url: this.url,
-				update_view: this.update_view,
+		this.on({
+			move_up: function() {
+				this.translate_view(0.0, -0.0625 * (this.get('view.imax') - this.get('view.imin')));
 			},
-			Gofr.helpers
-		));
+			move_down: function() {
+				this.translate_view(0.0, 0.0625 * (this.get('view.imax') - this.get('view.imin')));
+			},
+			move_left: function() {
+				this.translate_view(-0.0625 * (this.get('view.rmax') - this.get('view.rmin')), 0.0);
+			},
+			move_right: function() {
+				this.translate_view(0.0625 * (this.get('view.rmax') - this.get('view.rmin')), 0.0);
+			},
+			zoom_in: function() {
+				this.scale_view(0.9);
+			},
+			zoom_in_4x: function() {
+				this.scale_view(0.6);
+			},
+			zoom_out: function() {
+				this.scale_view(1.1);
+			},
+			zoom_out_4x: function() {
+				this.scale_view(1.4);
+			},	
+			go_to_bookmark: function(event) {
+				var bookmark, name;
+				 
+				name = 'bookmarks.' + $(event.node).data('bookmark');
+				if(!name in this.get('bookmarks')) { return; }
+				this.copy_view(name, 'view');
+			},
+			add_bookmark: function(event) {
+				var name;
 
-		this.update_view();
+				// TODO FIX THIS window.prompt SHIT
+				name = window.prompt('Enter a name:');
+
+				if(name) {
+					this.copy_view('view', 'bookmarks.' + name);
+					this.set('bookmarks.' + name + '.editable', true); 
+				}
+			},
+			update_bookmark: function(event) {
+				var name;
+
+				name = $(event.node).data('bookmark');
+				this.copy_view('view', 'bookmarks.' + name);
+				this.set('bookmarks.' + name + '.editable', true); 
+			},
+			delete_bookmark: function(event) {
+				var bookmarks;
+
+				bookmarks = this.get('bookmarks');
+				delete bookmarks[$(event.node).data('bookmark')];
+				this.update('bookmarks');
+			},
+			edit_view: function() {
+				var editor;
+
+				editor = this.findComponent('editor');
+				editor.fire('edit', 'view', this.json('view'));
+			},
+			edit_bookmarks: function() {
+				var editor;
+
+				editor = this.findComponent('editor');
+				editor.fire('edit', 'bookmarks', this.json('bookmarks'));
+			},
+			'editor.saved': function(key, text) {
+				this.set(key, JSON.parse(text));
+			}
+		});
 	},
-	url: function() {
-		return "/png?" + $.param(this.view.serialize());
+	json: function(key) {
+		return JSON.stringify(this.get(key), null, 2);
+	},
+	view_url: function(name) {
+		return "/png?" + $.param(this.get('view'));
 	},
 	update_view: function() {
 		var image, self;
 
 		self = this;
 
-		// Find some way to 2-way bind the image URL to the image?
 		image = $('#image');
 		image.css({height: image.width() + 'px'});
-		this.view.attr({
-			w: parseInt(image.width()),
-			h: parseInt(image.height())
-		});
+
+		this.set('view.w', parseInt(image.width()));
+		this.set('view.h', parseInt(image.height()));
 
 		i = new Image();
 		i.onload = function() {
 			image.css({
-				'background-image': "url(" + self.url() + ")"
+				'background-image': "url(" + self.view_url() + ")"
 			});
 		};
-		i.src = this.url();
+
+		i.src = this.view_url();
 	},
 	translate_view: function(r, i) {
-		this.view.attr({
-			rmin: this.view.rmin += r,
-			imin: this.view.imin += i,
-			rmax: this.view.rmax += r,
-			imax: this.view.imax += i
-		});
+		var view;
+
+		view = this.get('view');
+
+		view.rmin += r;
+		view.imin += i;
+		view.rmax += r;
+		view.imax += i;
+
+		this.update('view');
 	},
 	scale_view: function(factor) {
-		var rw, iw, rmid, imid;
+		var rw, iw, rmid, imid, view;
 
-		rw = (this.view.rmax - this.view.rmin) / 2.0;
-		iw = (this.view.imax - this.view.imin) / 2.0;
-		rmid = this.view.rmin + rw;
-		imid = this.view.imin + iw;
+		view = this.get('view');
 
-		this.view.attr({
-			rmin: rmid - (rw * factor),
-			imin: imid - (iw * factor),
-			rmax: rmid + (rw * factor),
-			imax: imid + (iw * factor)
+		rw = (view.rmax - view.rmin) / 2.0;
+		iw = (view.imax - view.imin) / 2.0;
+		rmid = view.rmin + rw;
+		imid = view.imin + iw;
+
+		view.rmin = rmid - (rw * factor);
+		view.imin = imid - (iw * factor);
+		view.rmax = rmid + (rw * factor);
+		view.imax = imid + (iw * factor);
+
+		this.update('view');
+	},
+	copy_view: function(src_key, dst_key) {
+		var view;
+
+		view = this.get(src_key);
+
+		this.set(dst_key, {
+			w: view.w,
+			h: view.h,
+			i: view.i,
+			e: view.e,
+			m: view.m,
+			c: view.c,
+			s: view.s,
+			rmin: view.rmin,
+			rmax: view.rmax,
+			imin: view.imin,
+			imax: view.imax,
 		});
 	},
-	set_view: function(view) {
-		this.view.attr(view);
-	},
 });
+Ractive.components.browser = Gofr.FractalBrowser;
 
 $(document).ready(function() {
-	var control;
-
-	control = new Gofr.FractalBrowser('#gofr');
-	control.update();
+	var ractive = Ractive({
+		el: '#gofr',
+		template: '#gofr-tmpl',
+		data: function() { return {}; },
+		components: {
+			browser: Gofr.FractalBrowser,
+		},
+	});
 });
+

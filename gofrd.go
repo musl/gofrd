@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"github.com/musl/libgofr"
+	"github.com/nfnt/resize"
 	"image"
 	"image/color"
 	"image/png"
+	"log"
 	"net/http"
 	"runtime"
 	"strconv"
+	"time"
 )
 
 func finish(w http.ResponseWriter, status int, message string) {
@@ -16,7 +19,15 @@ func finish(w http.ResponseWriter, status int, message string) {
 	fmt.Fprintf(w, message)
 }
 
-func route_index(w http.ResponseWriter, r *http.Request) {
+func logDuration(message string, start time.Time) {
+	end := time.Now()
+	log.Printf("%s: %v\n", message, end.Sub(start))
+}
+
+func route_png(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer logDuration(fmt.Sprintf("%s", r.URL.Path), start)
+
 	if r.Method != "GET" {
 		finish(w, http.StatusMethodNotAllowed, "Method not allowed.")
 		return
@@ -24,44 +35,57 @@ func route_index(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 
+	s, err := strconv.Atoi(q.Get("s"))
+	if err != nil {
+		s = 1
+	}
+
 	iw, err := strconv.Atoi(q.Get("w"))
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid w")
+		return
 	}
 
 	ih, err := strconv.Atoi(q.Get("h"))
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid h")
+		return
 	}
 
 	i, err := strconv.Atoi(q.Get("i"))
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid i")
+		return
 	}
 
 	er, err := strconv.ParseFloat(q.Get("e"), 64)
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid e")
+		return
 	}
 
 	rmin, err := strconv.ParseFloat(q.Get("rmin"), 64)
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid rmin")
+		return
 	}
 
 	imin, err := strconv.ParseFloat(q.Get("imin"), 64)
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid rmin")
+		return
 	}
 
 	rmax, err := strconv.ParseFloat(q.Get("rmax"), 64)
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid rmax")
+		return
 	}
 
 	imax, err := strconv.ParseFloat(q.Get("imax"), 64)
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid rmin")
+		return
 	}
 
 	c := q.Get("c")
@@ -77,6 +101,7 @@ func route_index(w http.ResponseWriter, r *http.Request) {
 		color_func = gofr.ColorSmooth
 	default:
 		finish(w, http.StatusUnprocessableEntity, "Invalid c")
+		return
 	}
 
 	hex := q.Get("m")
@@ -85,6 +110,7 @@ func route_index(w http.ResponseWriter, r *http.Request) {
 		m, err := strconv.ParseInt(hex[1:len(hex)], 16, 32)
 		if err != nil {
 			finish(w, http.StatusUnprocessableEntity, "Invalid m")
+			return
 		}
 		member_color = color.NRGBA64{
 			uint16(((m >> 16) & 0xff) * 0x101),
@@ -95,8 +121,8 @@ func route_index(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := gofr.Parameters{
-		ImageWidth:   iw,
-		ImageHeight:  ih,
+		ImageWidth:   iw * s,
+		ImageHeight:  ih * s,
 		MaxI:         i,
 		EscapeRadius: er,
 		Min:          complex(rmin, imin),
@@ -113,13 +139,18 @@ func route_index(w http.ResponseWriter, r *http.Request) {
 	contexts := gofr.MakeContexts(img, n, &p)
 	gofr.Render(n, contexts, gofr.Mandelbrot)
 
+	scaled_img := resize.Resize(uint(iw), uint(ih), image.Image(img), resize.Lanczos3)
+
 	w.Header().Set("Content-Type", "image/png")
-	png.Encode(w, img)
+	png.Encode(w, scaled_img)
 }
 
 func main() {
 	fs := http.FileServer(http.Dir("static"))
+	bind_addr := "0.0.0.0:8000"
+
 	http.Handle("/", fs)
-	http.HandleFunc("/png", route_index)
-	http.ListenAndServe(":8000", nil)
+	http.HandleFunc("/png", route_png)
+	log.Printf("Listening on: %s\n", bind_addr)
+	log.Fatal(http.ListenAndServe(bind_addr, nil))
 }
