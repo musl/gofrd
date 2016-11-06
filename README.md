@@ -12,3 +12,11 @@ To play:
 1. open http://127.0.0.1:8000/ in your browser of choice
 
 See also: https://github.com/musl/libgofr
+
+Libraries vendored in:
+- Go
+    - https://github.com/nfnt/resize
+- JS
+    - http://www.ractivejs.org/
+    - https://ace.c9.io/
+    - https://jquery.com/
