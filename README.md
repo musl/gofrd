@@ -10,3 +10,5 @@ To play:
 1. cd $GOPATH/src/github.com/musl/gofrd
 1. make
 1. open http://127.0.0.1:8000/ in your browser of choice
+
+See also: https://github.com/musl/libgofr
