@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/golang/net/websocket"
 	"github.com/musl/libgofr"
 	"github.com/nfnt/resize"
 	"image"
@@ -145,12 +146,20 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 	png.Encode(w, scaled_img)
 }
 
+/*
+ * TODO: need a protocol/lifecycle
+ */
+func handler_png(ws *websocket.Conn) {
+	fmt.Fprintf(ws, "Hello websockets.\n")
+}
+
 func main() {
 	fs := http.FileServer(http.Dir("static"))
 	bind_addr := "0.0.0.0:8000"
 
 	http.Handle("/", fs)
 	http.HandleFunc("/png", route_png)
+	http.Handle("/png-socket", websocket.Handler(handler_png))
 	log.Printf("Listening on: %s\n", bind_addr)
 	log.Fatal(http.ListenAndServe(bind_addr, nil))
 }
