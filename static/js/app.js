@@ -136,6 +136,9 @@ Gofr.FractalBrowser = Ractive.extend({
 			zoom_out_4x: function() {
 				this.scale_view(1.4);
 			},	
+			update_view: function() {
+				this.update_view();
+			},
 			go_to_bookmark: function(event) {
 				var bookmark, name;
 				 
