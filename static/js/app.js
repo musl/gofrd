@@ -27,11 +27,9 @@ Gofr.ModalEditor = Ractive.extend({
 
 		this.editor.setTheme("ace/theme/" + this.get('theme'));
 		this.session.setMode("ace/mode/" + this.get('mode'));
-		this.editor.$blockScrolling = Infinity;
 
-		this.observe('text', function(new_value, old_value) {
-			this.doc.setValue(new_value);
-		});
+		// Is this necessary?
+		this.editor.$blockScrolling = Infinity;
 
 		this.on({
 			save: function() {
@@ -43,13 +41,12 @@ Gofr.ModalEditor = Ractive.extend({
 				this.doc.setValue(this.get('text'));
 			},
 			dismiss: function() {
-				this.set('key', '');
-				this.set('text', '');
 				this.dialog.close();
 			},
 			edit: function(key, text) {
 				this.set('key', key);
 				this.set('text', text);
+				this.doc.setValue(text);
 				this.dialog.showModal();
 			}
 		});
@@ -111,7 +108,6 @@ Gofr.FractalBrowser = Ractive.extend({
 		});
 
 		this.observe('bookmarks', function() {
-			this.update_view();
 			Gofr.storage.setItem('gofr.browser.marks', this.json('bookmarks'));
 		});
 
@@ -150,7 +146,7 @@ Gofr.FractalBrowser = Ractive.extend({
 			add_bookmark: function(event) {
 				var name;
 
-				// TODO FIX THIS window.prompt SHIT
+				// TODO FIX THIS window.prompt 
 				name = window.prompt('Enter a name:');
 
 				if(name) {
