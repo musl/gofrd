@@ -81,9 +81,7 @@ Gofr.FractalBrowser = Ractive.extend({
 			editor: Gofr.ModalEditor
 	},
 	onrender: function() {
-			var marks, self, view;
-
-			self = this;
+			var marks, view;
 
 			view = JSON.parse(Gofr.storage.getItem('gofr.browser.view'));
 			if(view) {
@@ -95,13 +93,26 @@ Gofr.FractalBrowser = Ractive.extend({
 			marks = JSON.parse(Gofr.storage.getItem('gofr.browser.marks'));
 			if(marks) {
 				$.each(marks, function(key, value) {
-					self.set('bookmarks.' + key, value); 
-				});
+					this.set('bookmarks.' + key, value); 
+				}.bind(this));
 			} else {
 				this.copy_view('default_view', 'bookmarks.home');
 			}
+
+			this.socket = new WebSocket('ws://127.0.0.1:8000/png-socket');
+			this.socket.onmessage = function(event) {
+				console.log('socket: ' + event.data);
+			}
+			//this.socket.send('wat');
+	},
+	onunrender: function() {
+		if(this.socket) {
+			this.socet.close();
+		}
 	},
 	oncomplete: function() {
+		this.image = $('#image');
+
 		this.observe('view', function() {
 			this.update_view();
 			Gofr.storage.setItem('gofr.browser.view', this.json('view'));
@@ -194,23 +205,21 @@ Gofr.FractalBrowser = Ractive.extend({
 	view_url: function(name) {
 		return "/png?" + $.param(this.get('view'));
 	},
+	update_size: function() {
+		this.image.css({height: this.image.width() + 'px'});
+		this.set('view.w', parseInt(this.image.width()));
+		this.set('view.h', parseInt(this.image.height()));
+	},
 	update_view: function() {
-		var image, self;
+		var i;
 
-		self = this;
-
-		image = $('#image');
-		image.css({height: image.width() + 'px'});
-
-		this.set('view.w', parseInt(image.width()));
-		this.set('view.h', parseInt(image.height()));
-
+		this.update_size();
 		i = new Image();
 		i.onload = function() {
-			image.css({
-				'background-image': "url(" + self.view_url() + ")"
+			this.image.css({
+				'background-image': "url(" + this.view_url() + ")"
 			});
-		};
+		}.bind(this);
 
 		i.src = this.view_url();
 	},
