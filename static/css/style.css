@@ -58,7 +58,9 @@ h3 {
 }
 
 div#image {
-	width: 100%;
+  position: relative;
+	width: 700px;
+  height: 700px;
 	border: 1px #d0d0d0 solid;
 }
 

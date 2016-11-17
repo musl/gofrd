@@ -6,7 +6,7 @@ Gofr.storage = localStorage;
 
 Gofr.helpers = Ractive.defaults.data;
 Gofr.helpers.complex = function(r, i) {
-		return r + (i < 0 ? "" : "+") + i + "i";
+	return r + (i < 0 ? "" : "+") + i + "i";
 };
 
 Gofr.ModalEditor = Ractive.extend({
@@ -78,28 +78,35 @@ Gofr.FractalBrowser = Ractive.extend({
 		};
 	},
 	components: {
-			editor: Gofr.ModalEditor
+		editor: Gofr.ModalEditor
 	},
 	onrender: function() {
-			var marks, self, view;
+		var marks, self, view;
 
-			self = this;
+		self = this;
 
-			view = JSON.parse(Gofr.storage.getItem('gofr.browser.view'));
-			if(view) {
-				this.set('view', view);
-			} else {
-				this.copy_view('default_view', 'view');
-			}
+		view = JSON.parse(Gofr.storage.getItem('gofr.browser.view'));
+		if(view) {
+			this.set('view', view);
+		} else {
+			this.copy_view('default_view', 'view');
+		}
 
-			marks = JSON.parse(Gofr.storage.getItem('gofr.browser.marks'));
-			if(marks) {
-				$.each(marks, function(key, value) {
-					self.set('bookmarks.' + key, value); 
-				});
-			} else {
-				this.copy_view('default_view', 'bookmarks.home');
-			}
+		marks = JSON.parse(Gofr.storage.getItem('gofr.browser.marks'));
+		if(marks) {
+			$.each(marks, function(key, value) {
+				self.set('bookmarks.' + key, value); 
+			});
+		} else {
+			this.copy_view('default_view', 'bookmarks.home');
+		}
+
+		this.canvas = $(this.find('canvas'));
+		this.ctx = this.canvas[0].getContext('2d');
+
+    this.ring = $(this.find('div#ring'));
+    window.ring = this.ring;
+
 	},
 	oncomplete: function() {
 		this.observe('view', function() {
@@ -141,7 +148,7 @@ Gofr.FractalBrowser = Ractive.extend({
 			},
 			go_to_bookmark: function(event) {
 				var bookmark, name;
-				 
+
 				name = 'bookmarks.' + $(event.node).data('bookmark');
 				if(!name in this.get('bookmarks')) { return; }
 				this.copy_view(name, 'view');
@@ -185,6 +192,75 @@ Gofr.FractalBrowser = Ractive.extend({
 			},
 			'editor.saved': function(key, text) {
 				this.set(key, JSON.parse(text));
+			},
+			mouse: function(ractive_event) {
+				var self;
+				var canvas, ctx, event, x0, x1, y0, y1;
+
+				self = this;
+				event = ractive_event.original;
+
+				if(event.button !== 0) return;
+
+				x0 = Math.floor(event.pageX - this.canvas.offset().left);
+				y0 = Math.floor(event.pageY - this.canvas.offset().top);
+				x1 = x0;
+				y1 = y0;
+
+				this.canvas.on('mousemove mouseup mouseout', function handler(e) {
+					var cancel, clear, ch, cw, dr, di, h, i, r, v, w;
+
+					cw = self.canvas.width();
+					ch = self.canvas.height();
+
+					clear = function() {
+						self.ctx.save();
+						self.ctx.clearRect(0, 0, cw, ch);
+						self.ctx.restore();
+					};
+
+					cancel = function() {
+						self.canvas.off('mousemove mouseup mouseout', handler);
+						clear();
+					};
+
+					if(e.type === 'mouseout') {
+						cancel();
+						return;
+					}
+
+					if(e.type === 'mouseup' && x0 !== x1 && y0 !== y1) {
+						cancel();
+
+						v = self.get('view');
+
+						r = v.rmin;
+						i = v.imin;
+						w = v.rmax - r;
+						h = v.imax - i;
+						dr = w / cw;
+						di = h / ch;
+
+						v.rmin = r + dr * x0;
+						v.imin = i + di * y0;
+						v.rmax = r + dr * x1;
+						v.imax = i + di * y1;
+						self.update('view');
+
+						return;
+					}
+
+					x1 = Math.floor(e.pageX - self.canvas.offset().left);
+					y1 = y0 + ((x1 - x0) * (ch / cw));
+
+					clear();
+					self.ctx.strokeStyle = "rgba(0, 0, 0, 0.80)";
+					self.ctx.strokeRect(x0 - 1.5, y0 - 1.5, x1 - x0 + 1, y1 - y0 + 1);
+					self.ctx.strokeStyle = "rgba(255, 255, 255, 0.80)";
+					self.ctx.strokeRect(x0 - 0.5, y0 - 0.5, x1 - x0, y1 - y0);
+					self.ctx.fillStyle = "rgba(0, 220, 255, 0.20)";
+					self.ctx.fillRect(x0, y0, x1 - x0 - 1.5, y1 - y0 - 1.5);
+				});
 			}
 		});
 	},
@@ -198,9 +274,7 @@ Gofr.FractalBrowser = Ractive.extend({
 		var image, self;
 
 		self = this;
-
 		image = $('#image');
-		image.css({height: image.width() + 'px'});
 
 		this.set('view.w', parseInt(image.width()));
 		this.set('view.h', parseInt(image.height()));
@@ -210,8 +284,9 @@ Gofr.FractalBrowser = Ractive.extend({
 			image.css({
 				'background-image': "url(" + self.view_url() + ")"
 			});
+      self.ring.hide();
 		};
-
+    this.ring.show();
 		i.src = this.view_url();
 	},
 	translate_view: function(r, i) {
