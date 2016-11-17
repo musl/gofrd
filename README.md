@@ -13,10 +13,14 @@ To play:
 
 See also: https://github.com/musl/libgofr
 
-Libraries vendored in:
+Vendored Stuff:
+
 - Go
     - https://github.com/nfnt/resize
 - JS
     - http://www.ractivejs.org/
     - https://ace.c9.io/
     - https://jquery.com/
+- CSS
+    - http://purecss.io/
+    - http://fontawesome.io/
