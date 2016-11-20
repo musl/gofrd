@@ -33,9 +33,9 @@ Gofr.ModalEditor = Ractive.extend({
 
 		this.on({
 			save: function() {
+				this.dialog.close();
 				this.set('text', this.doc.getValue());
 				this.fire('saved', this.get('key'), this.get('text'));
-				this.dialog.close();
 			},
 			revert: function() {
 				this.doc.setValue(this.get('text'));
