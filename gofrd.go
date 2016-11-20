@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+var id_chan = make(chan int, 1)
+
 func finish(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
 	fmt.Fprintf(w, message)
@@ -25,8 +27,9 @@ func logDuration(message string, start time.Time) {
 }
 
 func route_png(w http.ResponseWriter, r *http.Request) {
+	id := <-id_chan
 	start := time.Now()
-	defer logDuration(fmt.Sprintf("%s", r.URL.Path), start)
+	defer logDuration(fmt.Sprintf("%08d %s", id, r.URL.Path), start)
 
 	if r.Method != "GET" {
 		finish(w, http.StatusMethodNotAllowed, "Method not allowed.")
@@ -131,6 +134,8 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 		MemberColor:  member_color,
 	}
 
+	log.Printf("%08d rendering\n", id)
+
 	// TODO: Check parameters and set reasonable bounds on what we can
 	// quickly calculate.
 
@@ -148,6 +153,12 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 func main() {
 	fs := http.FileServer(http.Dir("static"))
 	bind_addr := "0.0.0.0:8000"
+
+	go func() {
+		for i := 0; ; i++ {
+			id_chan <- i
+		}
+	}()
 
 	http.Handle("/", fs)
 	http.HandleFunc("/png", route_png)
