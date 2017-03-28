@@ -85,3 +85,8 @@ dialog > form {
 	text-align: right;
 }
 
+label {
+  margin-right: 1em !important;
+  margin-bottom: 0.5em !important;
+}
+

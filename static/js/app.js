@@ -27,8 +27,6 @@ Gofr.ModalEditor = Ractive.extend({
 
 		this.editor.setTheme("ace/theme/" + this.get('theme'));
 		this.session.setMode("ace/mode/" + this.get('mode'));
-
-		// Is this necessary?
 		this.editor.$blockScrolling = Infinity;
 
 		this.on({

@@ -5,7 +5,6 @@ import (
 	"github.com/musl/libgofr"
 	"github.com/nfnt/resize"
 	"image"
-	"image/color"
 	"image/png"
 	"log"
 	"net/http"
@@ -43,19 +42,19 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 		s = 1
 	}
 
-	iw, err := strconv.Atoi(q.Get("w"))
+	width, err := strconv.Atoi(q.Get("w"))
 	if err != nil {
-		finish(w, http.StatusUnprocessableEntity, "Invalid w")
+		finish(w, http.StatusUnprocessableEntity, "Invalid width")
 		return
 	}
 
-	ih, err := strconv.Atoi(q.Get("h"))
+	height, err := strconv.Atoi(q.Get("h"))
 	if err != nil {
-		finish(w, http.StatusUnprocessableEntity, "Invalid h")
+		finish(w, http.StatusUnprocessableEntity, "Invalid height")
 		return
 	}
 
-	i, err := strconv.Atoi(q.Get("i"))
+	iterations, err := strconv.Atoi(q.Get("i"))
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid i")
 		return
@@ -92,46 +91,17 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := q.Get("c")
-	color_func := gofr.ColorMono
-	switch c {
-	case "mono":
-		color_func = gofr.ColorMono
-	case "stripe":
-		color_func = gofr.ColorMonoStripe
-	case "bands":
-		color_func = gofr.ColorBands
-	case "smooth":
-		color_func = gofr.ColorSmooth
-	default:
-		finish(w, http.StatusUnprocessableEntity, "Invalid c")
-		return
-	}
-
 	hex := q.Get("m")
-	member_color := color.NRGBA64{0, 0, 0, 0xffff}
-	if len(hex) > 2 {
-		m, err := strconv.ParseInt(hex[1:len(hex)], 16, 32)
-		if err != nil {
-			finish(w, http.StatusUnprocessableEntity, "Invalid m")
-			return
-		}
-		member_color = color.NRGBA64{
-			uint16(((m >> 16) & 0xff) * 0x101),
-			uint16(((m >> 8) & 0xff) * 0x101),
-			uint16((m & 0xff) * 0x101),
-			0xffff,
-		}
-	}
 
 	p := gofr.Parameters{
-		ImageWidth:   iw * s,
-		ImageHeight:  ih * s,
-		MaxI:         i,
+		ImageWidth:   width * s,
+		ImageHeight:  height * s,
+		MaxI:         iterations,
 		EscapeRadius: er,
 		Min:          complex(rmin, imin),
 		Max:          complex(rmax, imax),
-		ColorFunc:    color_func,
-		MemberColor:  member_color,
+		ColorFunc:    c,
+		MemberColor:  hex,
 	}
 
 	log.Printf("%08d rendering\n", id)
@@ -144,7 +114,7 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 	contexts := gofr.MakeContexts(img, n, &p)
 	gofr.Render(n, contexts, gofr.Mandelbrot)
 
-	scaled_img := resize.Resize(uint(iw), uint(ih), image.Image(img), resize.Lanczos3)
+	scaled_img := resize.Resize(uint(width), uint(height), image.Image(img), resize.Lanczos3)
 
 	w.Header().Set("Content-Type", "image/png")
 	png.Encode(w, scaled_img)
