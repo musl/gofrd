@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/musl/libgofr"
 	"github.com/nfnt/resize"
 	"image"
@@ -15,7 +16,7 @@ import (
 
 const Version = "0.0.2"
 
-var id_chan = make(chan int, 1)
+var id_chan = make(chan uuid.UUID, 100)
 
 func finish(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
@@ -24,13 +25,14 @@ func finish(w http.ResponseWriter, status int, message string) {
 
 func logDuration(message string, start time.Time) {
 	end := time.Now()
-	log.Printf("%s: %v\n", message, end.Sub(start))
+	log.Printf("%s %v\n", message, end.Sub(start))
 }
 
 func route_png(w http.ResponseWriter, r *http.Request) {
 	id := <-id_chan
 	start := time.Now()
-	defer logDuration(fmt.Sprintf("%08d %s", id, r.URL.Path), start)
+	log.Printf("%s %s %s %s", id, r.RemoteAddr, r.Method, r.URL.Path)
+	defer logDuration(fmt.Sprintf("%s", id), start)
 
 	if r.Method != "GET" {
 		finish(w, http.StatusMethodNotAllowed, "Method not allowed.")
@@ -106,8 +108,6 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 		MemberColor:  hex,
 	}
 
-	log.Printf("%08d rendering\n", id)
-
 	// TODO: Check parameters and set reasonable bounds on what we can
 	// quickly calculate.
 
@@ -128,7 +128,7 @@ func main() {
 
 	go func() {
 		for i := 0; ; i++ {
-			id_chan <- i
+			id_chan <- uuid.New()
 		}
 	}()
 
