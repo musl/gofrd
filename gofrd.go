@@ -134,6 +134,8 @@ func main() {
 
 	http.Handle("/", fs)
 	http.HandleFunc("/png", route_png)
+	log.Printf("gofrd v%s", Version)
+	log.Printf("libgofrd v%s", gofr.Version)
 	log.Printf("Listening on: %s\n", bind_addr)
 	log.Fatal(http.ListenAndServe(bind_addr, nil))
 }
