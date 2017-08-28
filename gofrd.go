@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const Version = "0.0.2"
+
 var id_chan = make(chan int, 1)
 
 func finish(w http.ResponseWriter, status int, message string) {
