@@ -113,7 +113,8 @@
 					<div class="pure-u-1 pure-u-md-2-3">
               <label><i class="fa fa-bookmark"></i>&nbsp;bookmarks</label>
 							{{#bookmarks:name}}
-                <i class="fa fa-bookmark"></i>
+                <i class="fa fa-bookmark"
+                   class-current="{{current_bookmark(name)}}"></i>
 								<a href="#" on-click="go_to_bookmark" data-bookmark="{{name}}">{{name}}</a>
 								{{#if editable}}
 									<a href="#" on-click="delete_bookmark" data-bookmark="{{name}}"><i class="fa fa-times"></i></a>
