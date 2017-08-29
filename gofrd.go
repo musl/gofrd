@@ -7,8 +7,11 @@ import (
 	"github.com/nfnt/resize"
 	"image"
 	"image/png"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
@@ -18,40 +21,48 @@ const Version = "0.0.2"
 
 var id_chan = make(chan uuid.UUID, 100)
 
-func finish(w http.ResponseWriter, status int, message string) {
-	w.WriteHeader(status)
-	fmt.Fprintf(w, message)
-}
-
-func logDuration(message string, start time.Time) {
-	end := time.Now()
-	log.Printf("%s %v\n", message, end.Sub(start))
-}
-
-type logResponseWriter struct {
+type LogResponseWriter struct {
 	http.ResponseWriter
 	Status int
+	Start  time.Time
+	End    time.Time
 }
 
-func (self *logResponseWriter) WriteHeader(code int) {
+func NewLogResponseWriter(w http.ResponseWriter) *LogResponseWriter {
+	return &LogResponseWriter{w, 0, time.Now(), time.Now()}
+}
+
+func (self *LogResponseWriter) WriteHeader(code int) {
 	self.Status = code
 	self.ResponseWriter.WriteHeader(code)
 }
 
-func timedLogWrapper(h http.HandlerFunc) http.Handler {
+func (self LogResponseWriter) Log(message string) {
+	self.End = time.Now()
+	log.Printf("%s %v\n", message, self.End.Sub(self.Start))
+}
+
+func wrapHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := <-id_chan
-		start := time.Now()
-		lrw := logResponseWriter{w, http.StatusOK}
+		lrw := NewLogResponseWriter(w)
 
-		log.Printf("%s %s %s %s", id, r.RemoteAddr, r.Method, r.URL.Path)
-		defer logDuration(fmt.Sprintf("%s %v", id, lrw.Status), start)
-
-		h.ServeHTTP(w, r)
+		h.ServeHTTP(lrw, r)
+		lrw.Log(fmt.Sprintf("%d %s %s %s", lrw.Status, r.Method, r.URL.Path, r.RemoteAddr))
 	})
 }
 
+func wrapHandlerFunc(h http.HandlerFunc) http.Handler {
+	return wrapHandler(http.Handler(h))
+}
+
+func finish(w http.ResponseWriter, status int, message string) {
+	w.WriteHeader(status)
+	io.WriteString(w, message)
+}
+
 func route_png(w http.ResponseWriter, r *http.Request) {
+	id := <-id_chan
+
 	if r.Method != "GET" {
 		finish(w, http.StatusMethodNotAllowed, "Method not allowed.")
 		return
@@ -128,6 +139,10 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: Check parameters and set reasonable bounds on what we can
 	// quickly calculate.
+	//
+	// Create a pool of goroutines that process render jobs, with a
+	// time-out for accepting render jobs. Have UI support for the "try
+	// again later" response.
 
 	img := image.NewNRGBA64(image.Rect(0, 0, p.ImageWidth, p.ImageHeight))
 	n := runtime.NumCPU()
@@ -137,12 +152,37 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 	scaled_img := resize.Resize(uint(width), uint(height), image.Image(img), resize.Lanczos3)
 
 	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("X-Render-Job-ID", id.String())
+	w.WriteHeader(http.StatusOK)
 	png.Encode(w, scaled_img)
 }
 
+func route_status(w http.ResponseWriter, r *http.Request) {
+	finish(w, http.StatusOK, "OK")
+}
+
 func main() {
-	fs := http.FileServer(http.Dir("static"))
+	var value string
+
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.LUTC)
+	log.Printf("gofrd v%s", Version)
+	log.Printf("libgofrd v%s", gofr.Version)
+
+	static_dir := "./static"
+	if value = os.Getenv("GOFR_STATIC_DIR"); value != "" {
+		static_dir = value
+	}
+	static_dir, err := filepath.Abs(static_dir)
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("Serving from: %s\n", static_dir)
+
 	bind_addr := "0.0.0.0:8000"
+	if value = os.Getenv("GOFR_BIND_ADDR"); value != "" {
+		bind_addr = value
+	}
+	log.Printf("Listening on: %s\n", bind_addr)
 
 	go func() {
 		for i := 0; ; i++ {
@@ -150,12 +190,10 @@ func main() {
 		}
 	}()
 
-	http.Handle("/", fs)
-	http.Handle("/png", timedLogWrapper(route_png))
+	http.Handle("/", wrapHandler(http.FileServer(http.Dir(static_dir))))
+	http.Handle("/png", wrapHandlerFunc(route_png))
+	http.Handle("/status", wrapHandlerFunc(route_status))
 
-	log.Printf("gofrd v%s", Version)
-	log.Printf("libgofrd v%s", gofr.Version)
-	log.Printf("Listening on: %s\n", bind_addr)
-
+	/* Run the thing. */
 	log.Fatal(http.ListenAndServe(bind_addr, nil))
 }
