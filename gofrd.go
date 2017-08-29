@@ -28,12 +28,30 @@ func logDuration(message string, start time.Time) {
 	log.Printf("%s %v\n", message, end.Sub(start))
 }
 
-func route_png(w http.ResponseWriter, r *http.Request) {
-	id := <-id_chan
-	start := time.Now()
-	log.Printf("%s %s %s %s", id, r.RemoteAddr, r.Method, r.URL.Path)
-	defer logDuration(fmt.Sprintf("%s", id), start)
+type logResponseWriter struct {
+	http.ResponseWriter
+	Status int
+}
 
+func (self *logResponseWriter) WriteHeader(code int) {
+	self.Status = code
+	self.ResponseWriter.WriteHeader(code)
+}
+
+func timedLogWrapper(h http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := <-id_chan
+		start := time.Now()
+		lrw := logResponseWriter{w, http.StatusOK}
+
+		log.Printf("%s %s %s %s", id, r.RemoteAddr, r.Method, r.URL.Path)
+		defer logDuration(fmt.Sprintf("%s %v", id, lrw.Status), start)
+
+		h.ServeHTTP(w, r)
+	})
+}
+
+func route_png(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		finish(w, http.StatusMethodNotAllowed, "Method not allowed.")
 		return
@@ -133,9 +151,11 @@ func main() {
 	}()
 
 	http.Handle("/", fs)
-	http.HandleFunc("/png", route_png)
+	http.Handle("/png", timedLogWrapper(route_png))
+
 	log.Printf("gofrd v%s", Version)
 	log.Printf("libgofrd v%s", gofr.Version)
 	log.Printf("Listening on: %s\n", bind_addr)
+
 	log.Fatal(http.ListenAndServe(bind_addr, nil))
 }
