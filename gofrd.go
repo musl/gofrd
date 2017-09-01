@@ -75,6 +75,11 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 		s = 1
 	}
 
+	e, err := strconv.Atoi(q.Get("p"))
+	if err != nil {
+		e = 1
+	}
+
 	width, err := strconv.Atoi(q.Get("w"))
 	if err != nil {
 		finish(w, http.StatusUnprocessableEntity, "Invalid width")
@@ -135,6 +140,7 @@ func route_png(w http.ResponseWriter, r *http.Request) {
 		Max:          complex(rmax, imax),
 		ColorFunc:    c,
 		MemberColor:  hex,
+		Power:        e,
 	}
 
 	// TODO: Check parameters and set reasonable bounds on what we can
