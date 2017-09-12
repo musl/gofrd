@@ -1,0 +1,18 @@
+language: go
+
+go:
+    - 1.7
+    - 1.8
+    - 1.9
+    - tip
+
+sudo: false
+
+install:
+    - go get github.com/musl/gofr/...
+
+# For now, as long as it builds, I'm happy. I'll get around to
+# tests, I swear.
+script: 
+    - make test
+
